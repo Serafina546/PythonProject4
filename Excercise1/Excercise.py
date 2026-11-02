@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.rcParams["font.family"] = "Arial"
 
-### 2a
-
+### 32a
 # Setting the parameters
 n_steps = 60      # Number of time steps. Definition in excercise: 1 time step = 1 day.
 k = 0.1           # Storage constant [1/time step]
