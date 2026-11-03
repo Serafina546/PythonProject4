@@ -7,7 +7,7 @@ plt.rcParams["font.family"] = "Arial"
 ### Linear Storage Model with real precipitation data, for the full length of the time series 01.01.1981- 31.12.2020
 # CSV-Datei einlesen
 script_dir = Path(__file__).resolve().parent
-csv_path = (script_dir/ "Precipitation_data"/ "Camels_Precipitation"/ "CAMELS_CH_obs_based_2244.csv")
+csv_path = (script_dir/ "data"/ "CAMELS_CH_obs_based_2244.csv")
 data = pd.read_csv(csv_path)
 
 # Niederschlagsdaten aus der CSV-Datei verwenden [mm/day]
@@ -18,7 +18,6 @@ P = np.nan_to_num(P, nan=0.0)
 
 # Anzahl der Zeitschritte
 n_steps = len(P)
-
 
 ### PET: Anwendung der Hargreaves-Samani Methode für die Berechnung der PET
 # Datum und Temperaturdaten
@@ -124,5 +123,10 @@ ax2.set_ylabel("Precipitation [mm/day]")
 ax2.set_ylim(max(1, np.nanmax(P) * 1.2), 0)
 fig.tight_layout()
 plt.show()
+
+
+
+
+
 
 
