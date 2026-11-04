@@ -5,16 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9ae1d168-3acc-4d4c-841e-5f98e97c896e" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Flowerpot_our_data/data/CAMELS_CH_obs_based_2244.csv" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Flowerpot_our_data/data/CAMELS_CH_sim_based_2244.csv" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Flowerpot_our_data/data/camels_ch_data_description.pdf" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Flowerpot_our_data/data/data_MeteoSchweiz_Simplon Dorf_SIM.csv" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Flowerpot_our_data/data/parameter description_data_MeteoSchweiz_Simplon Dorf_SIM.csv" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Flowerpot_our_data/main model.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Flowerpot_our_data/snow_model_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.name" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.name" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Flowerpot_our_data/Flowerpot_linear_storage.py" beforeDir="false" afterPath="$PROJECT_DIR$/Flowerpot_our_data/Flowerpot_linear_storage.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Flowerpot_our_data/Flowerpot_linear_storage_test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Krummbach_model/main model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Krummbach_model/main model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Krummbach_model/snow_model_test.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,27 +41,27 @@
   &quot;associatedIndex&quot;: 5
 }</component>
   <component name="ProjectId" id="3KPC51o3LnEH56u3xCECLLNsFQ2" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.Excercise.executor": "Run",
-    "Python.Flowerpot_linear_storage.executor": "Run",
-    "Python.Flowerpot_linear_storage_test.executor": "Run",
-    "Python.main model.executor": "Run",
-    "Python.snow model.executor": "Run",
-    "Python.snow_model_test.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "/Users/serafinaheiter/Documents/GitHub/PythonProject4/Flowerpot_our_data",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.Excercise.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Flowerpot_linear_storage.executor&quot;: &quot;Run&quot;,
+    &quot;Python.Flowerpot_linear_storage_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.main model.executor&quot;: &quot;Run&quot;,
+    &quot;Python.snow model.executor&quot;: &quot;Run&quot;,
+    &quot;Python.snow_model_test.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/serafinaheiter/Documents/GitHub/PythonProject4/Flowerpot_our_data&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/Flowerpot_our_data" />
@@ -79,7 +73,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-fc1d50d2d915-aa17d162503b-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-243.24978.54" />
+        <option value="bundled-python-sdk-dfff61a61320-9cdd278e9d02-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-251.25410.159" />
       </set>
     </attachedChunks>
   </component>
