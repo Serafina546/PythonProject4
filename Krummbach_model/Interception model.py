@@ -7,7 +7,7 @@ import pandas as pd
 plt.rcParams["font.family"] = "Arial"
 
 # Read data
-data_obs = pd.read_csv(r"data\CAMELS_CH_obs_based_2244.csv", parse_dates=["date"])
+data_obs = pd.read_csv(r"../data/CAMELS_CH_obs_based_2244.csv", parse_dates=["date"])
 
 data_obs = data_obs.set_index("date")
 

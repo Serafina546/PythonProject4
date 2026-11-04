@@ -7,8 +7,8 @@ import pandas as pd
 plt.rcParams["font.family"] = "Arial"
 
 # Load CSV files
-data_sim = pd.read_csv(r"data\CAMELS_CH_sim_based_2244.csv", parse_dates=["date"])
-data_obs = pd.read_csv(r"data\CAMELS_CH_obs_based_2244.csv", parse_dates=["date"])
+data_sim = pd.read_csv(r"../data/CAMELS_CH_sim_based_2244.csv", parse_dates=["date"])
+data_obs = pd.read_csv(r"../data/CAMELS_CH_obs_based_2244.csv", parse_dates=["date"])
 
 
 # Merge the datasets
@@ -94,6 +94,7 @@ ax.set_title("Observed vs. simulated SWE for 1999 - 2020 (years with observed da
 ax.legend()
 plt.show()
 
+'''
 # Plot the hydrological years to compare observed and simulated SWE
 # define hydrological years (start, ende, title)
 hydro_years = []
@@ -135,3 +136,4 @@ for start_date, end_date, title_text in hydro_years:
 
     plt.tight_layout()
     plt.show()
+'''
