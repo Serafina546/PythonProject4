@@ -123,10 +123,3 @@ ax2.set_ylabel("Precipitation [mm/day]")
 ax2.set_ylim(max(1, np.nanmax(P) * 1.2), 0)
 fig.tight_layout()
 plt.show()
-
-
-
-
-
-
-

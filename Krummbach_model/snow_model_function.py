@@ -3,27 +3,25 @@ import numpy as np
 
 def run_snow_model(P, T, T_min=1.0, T_max=3.0, m_f=2.0, T_T=0.0, SWE0=0.0):
     """
-    Parameters:
-
-    P : np.array -> Niederschlag (mm/d)
-    T : np.array -> Mittlere Tagestemperatur (°C)
-    T_min : float -> Temperatur unter der 100% Schnee fällt
-    T_max : float -> Temperatur über der 100% Regen fällt
-    m_f : float -> Gradtag-Schmelzfaktor [mm/(°C * day)]
-    T_T : float -> Schwellenwertemperatur für Schmelze
-    SWE0 : float -> Initialer SWE zu Beginn
+    P : np.array -> Precipitation (mm/d)
+    T : np.array -> Mean daily temperature (°C)
+    T_min : float -> Temperature below which 100% snow falls
+    T_max : float -> Temperature above which 100% rain falls
+    m_f : float -> Degree-day melt factor [mm/(°C * day)]
+    T_T : float -> Threshold temperature for melt
+    SWE0 : float -> Initial SWE at the start
 
     Returns:
 
-    SWE_mod : np.array -> Simulierter Schneewasseräquivalent
-    Outflow : np.array -> Gesamter Abfluss aus dem Schneepaket (Regen + Schmelze)
-    P_snow  : np.array -> Schneeanteil des Niederschlags
-    P_rain  : np.array -> Regenanteil des Niederschlags
-    Melt    : np.array -> Tägliche Schmelze
+    SWE_mod : np.array -> Simulated snow water equivalent
+    Outflow : np.array -> Total outflow from the snowpack (rain + melt)
+    P_snow  : np.array -> Snow fraction of precipitation
+    P_rain  : np.array -> Rain fraction of precipitation
+    Melt    : np.array -> Daily melt
     """
     n = len(P)
 
-    # Arrays für Outputs initialisieren
+    # Arrays for Outputs
     SWE_mod = np.zeros(n)
     P_snow = np.zeros(n)
     P_rain = np.zeros(n)
@@ -58,7 +56,7 @@ def run_snow_model(P, T, T_min=1.0, T_max=3.0, m_f=2.0, T_T=0.0, SWE0=0.0):
         # 4. Total Outflow (Rainfall + Meltwater)
         Outflow[t] = P_rain[t] + Melt[t]
 
-        # Update für Zeitschritt t+1
+        # Update for time step t+1
         SWE_prev = SWE_mod[t]
 
     return SWE_mod, Outflow, P_snow, P_rain, Melt
