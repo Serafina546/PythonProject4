@@ -1,7 +1,11 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import pathlib as Path
 
 from snow_model_function import run_snow_model
+from PET_model_function import calculate_hargreaves_pet
+from interception_model_function import run_interception_model
+from flowerpot_model_function import run_flowerpot_model
 
 plt.rcParams["font.family"] = "Arial"
 
@@ -14,16 +18,74 @@ data_sim = data_sim.set_index("date")
 data = data_obs.join(data_sim, how="inner", suffixes=("_obs", "_sim"))
 
 # extract variables
-P = data["precipitation(mm/d)"].values          # Precipitation
-T = data["temperature_mean(degC)"].values       # Temperature
+dates = data.index
+P = data["precipitation(mm/d)"].values
+T_mean = data["temperature_mean(degC)"].to_numpy(dtype=float)
+T_min = data["temperature_min(degC)"].to_numpy(dtype=float)
+T_max = data["temperature_max(degC)"].to_numpy(dtype=float)
+Q_obs = data["discharge_spec(mm/d)"].to_numpy(dtype=float)
 
-# Model
+P = pd.Series(P).fillna(0.0).to_numpy()
 
+### Model
+
+## 1. Calculate PET
+PET = calculate_hargreaves_pet(
+    dates=dates,
+    T_mean=T_mean,
+    T_min=T_min,
+    T_max=T_max,
+    latitude_deg=46.230046)
+
+## 2. snow model
+# input: Precipitation (P) and Temperature (T_mean)
+# Output: SWE and Outflow
+# Parameters can be changed
 SWE_mod, Outflow, P_snow, P_rain, Melt = run_snow_model(
     P=P,
-    T=T,
+    T=T_mean,
     T_min=1.0,
     T_max=3.0,
     m_f=2.0,
     T_T=0.0,
     SWE0=0.0)
+
+## 3. interception model
+# Input: Outflow (from snow model) and PET
+# Output: Netto Precipitation (P_NET) and remaining PET for transpiration
+# Parameter can be changed
+P_net, Evap_icept, PET_transpiration, Unloading = run_interception_model(
+    P=Outflow,
+    PET=PET,
+    icept_threshold=1.5)
+
+## 4. Flowerpot model (soil/storage model)
+# Input: effective net precipitation and remaining PET
+# Output: Output: Simulated discharge time series (Q), soil water storage (S), soil evaporation (ET_soil)
+Q_modelled, S_soil, ET_soil = run_flowerpot_model(
+    P_eff=P_net,
+    PET_remaining=PET_transpiration,
+    k=0.1,
+    S0=0.0)
+
+### Plots
+fig, ax = plt.subplots(figsize=(14, 6))
+
+ax.plot(dates, Q_modelled, label="Modelled Discharge", linewidth=0.8, color="red")
+ax.plot(dates, Q_obs, label="Observed Discharge", linewidth=0.8, color="black", alpha=0.7)
+
+ax.set_xlabel("Date")
+ax.set_ylabel("Discharge [mm/day]")
+ax.set_title("Hydrological Model Krummbach: Modelled vs. Observed Discharge")
+ax.legend(loc="upper left")
+ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+# Precipitation on y-Axis
+ax2 = ax.twinx()
+ax2.bar(dates, P, width=1.0, color="darkblue", alpha=0.2, label="Precipitation")
+ax2.set_ylabel("Precipitation [mm/day]")
+ax2.set_ylim(max(1, pd.Series(P).max() * 1.5), 0)
+ax2.legend(loc="upper right")
+
+fig.tight_layout()
+plt.show()
