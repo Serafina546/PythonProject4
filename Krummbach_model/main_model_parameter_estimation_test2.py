@@ -152,11 +152,6 @@ def run_model(params, df, initial_states=None):
 
     return Q_modelled, final_states
 
-# ÄNDERUNG: zweite run_model-Version ("which one?") entfernt. Sie hatte falsche
-# Einrückung, ein doppeltes "Outflow" und SWE/S waren nicht definiert.
-# Die erste Version oben ist die richtige.
-
-
 ### 4. Kalibirierung der Parameter
 # ÄNDERUNG: "minimize" mit method="differential_evolution" gibt es nicht.
 # differential_evolution wird direkt verwendet (oben bereits importiert).
