@@ -94,7 +94,6 @@ def compute_bias(q_obs, q_sim):
   return np.sum(q_sim - q_obs) / np.sum(q_obs) * 100  # in Prozent
 
 ### 3. Modellkkette für einen Zeitraum bündeln
-
 from scipy.optimize import differential_evolution
 def run_model(params, df, initial_states=None):
 
@@ -153,10 +152,7 @@ def run_model(params, df, initial_states=None):
     return Q_modelled, final_states
 
 ### 4. Kalibirierung der Parameter
-# ÄNDERUNG: "minimize" mit method="differential_evolution" gibt es nicht.
-# differential_evolution wird direkt verwendet (oben bereits importiert).
-
-# ÄNDERUNG: Warm-up und Kalibrierung zusammen simulieren.
+# Warm-up und Kalibrierung zusammen simulieren.
 # Das Warm-up (1981-82) wird mit jedem Parametersatz neu gerechnet; die Endzustände
 # (SWE, S) dienen als Anfangszustände der Kalibrierungsperiode.
 def simulate_periods(params):
@@ -164,7 +160,7 @@ def simulate_periods(params):
   Q_calib, states_calib = run_model(params, calib_data, initial_states=states_warm)
   return Q_calib, states_calib
 
-# ÄNDERUNG: Zielfunktion kann gewählt werden (NSE, Log-NSE oder Bias).
+# Zielfunktion kann gewählt werden (NSE, Log-NSE oder Bias).
 # differential_evolution übergibt die Zusatzargumente über args=(...)
 def objective_function(params, metric="nse"):
   Q_sim, _ = simulate_periods(params)   # ÄNDERUNG: run_model gibt ein Tuple zurück
@@ -190,7 +186,7 @@ bounds = [
     (0.001, 0.5),
 ]
 
-# ÄNDERUNG: if-Guard nötig, falls workers=-1 (Parallelisierung) verwendet wird
+# if-Guard nötig, falls workers=-1 (Parallelisierung) verwendet wird
 if __name__ == "__main__":
   result = differential_evolution(
       objective_function, bounds,
@@ -207,7 +203,7 @@ if __name__ == "__main__":
   print("Best parameters:", best_params)
 
   ### 5. Validierung und Auswertung
-  # ÄNDERUNG: Kalibrierungsperiode auswerten (Simulation inkl. Warm-up)
+  # Kalibrierungsperiode auswerten (Simulation inkl. Warm-up)
   Q_calib_sim, states_calib = simulate_periods(best_params)
   Q_calib_obs = calib_data["discharge_spec(mm/d)"].values
 
@@ -216,7 +212,7 @@ if __name__ == "__main__":
   print(f"Calibration Bias: {compute_bias(Q_calib_obs, Q_calib_sim):.2f}%")
 
   # Simulation für den Validierungszeitraum mit den kalibrierten Parametern
-  # ÄNDERUNG: Anfangszustände = Endzustände der Kalibrierung; Rückgabe ist ein Tuple
+  # Anfangszustände = Endzustände der Kalibrierung; Rückgabe ist ein Tuple
   Q_val_sim, _ = run_model(best_params, val_data, initial_states=states_calib)
   Q_val_obs = val_data["discharge_spec(mm/d)"].values
 
