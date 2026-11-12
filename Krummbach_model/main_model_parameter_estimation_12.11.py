@@ -1,5 +1,3 @@
-### main model parameter estimation ###
-
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -27,7 +25,16 @@ T_min = data["temperature_min(degC)"].to_numpy(dtype=float)
 T_max = data["temperature_max(degC)"].to_numpy(dtype=float)
 Q_obs = data["discharge_spec(mm/d)"].to_numpy(dtype=float)
 
-P = pd.Series(P).fillna(0.0).to_numpy() # Achtung: fehlende Niederschalgswerte in der Tabelle werden = 0 gesetzt, das muss aber nicht den tatsächlichgefallenen Niederchlägen entsprechen!!
+# Anzahl fehlender Niederschlagswerte =0
+s = pd.Series(P)
+anzahl_fehlend = s.isna().sum()
+print(f"Anzahl fehlender Niederschlagswerte: {anzahl_fehlend}")
+P = s.fillna(0.0).to_numpy()
+
+P = pd.Series(P).fillna(0.0).to_numpy()
+
+# Run_model liest den Niederschlag aus dem DataFrame, daher dort auch NaN -> 0 setzen
+data["precipitation(mm/d)"] = P
 
 ### Model
 
@@ -92,8 +99,7 @@ def compute_bias(q_obs, q_sim):
   q_obs, q_sim = q_obs[mask], q_sim[mask]
   return np.sum(q_sim - q_obs) / np.sum(q_obs) * 100  # in Prozent
 
-### 3. Modellkette für einen Zeitraum bündeln
-
+### 3. Modellkkette für einen Zeitraum bündeln
 from scipy.optimize import differential_evolution
 def run_model(params, df, initial_states=None):
 
@@ -151,17 +157,32 @@ def run_model(params, df, initial_states=None):
 
     return Q_modelled, final_states
 
-
 ### 4. Kalibirierung der Parameter
-from scipy.optimize import minimize # Diese Funktion sucht nach den optimalen Parameterwerten, indem sie eine Zielfunktion minimiert.
+# Warm-up und Kalibrierung zusammen simulieren.
+# Das Warm-up (1981-82) wird mit jedem Parametersatz neu gerechnet; die Endzustände
+# (SWE, S) dienen als Anfangszustände der Kalibrierungsperiode.
+def simulate_periods(params):
+  Q_warm, states_warm = run_model(params, warmup_data)
+  Q_calib, states_calib = run_model(params, calib_data, initial_states=states_warm)
+  return Q_calib, states_calib
 
-def objective_function(params):
-  Q_sim = run_model(params, calib_data)
+# Zielfunktion kann gewählt werden (NSE, Log-NSE oder Bias).
+# differential_evolution übergibt die Zusatzargumente über args=(...)
+def objective_function(params, metric="nse"):
+  Q_sim, _ = simulate_periods(params)   # ÄNDERUNG: run_model gibt ein Tuple zurück
   Q_obs = calib_data["discharge_spec(mm/d)"].values
-  # Wir minimieren 1 - NSE (weil minimize eine Kostenfunktion minimiert)
-  return 1 - compute_nse(Q_obs, Q_sim)
+  if not np.all(np.isfinite(Q_sim)):
+    return 1e6
+  if metric == "nse":
+    # Wir minimieren 1 - NSE (weil minimize eine Kostenfunktion minimiert)
+    return 1 - compute_nse(Q_obs, Q_sim)
+  if metric == "log_nse":
+    return 1 - compute_log_nse(Q_obs, Q_sim)
+  if metric == "bias":
+    return abs(compute_bias(Q_obs, Q_sim))
 
 # Startwerte für [T_min, T_max, m_f, icept_threshold, k]
+# (differential_evolution braucht keinen Startwert, nur die bounds)
 initial_guess = [1.0, 3.0, 3.0, 0.5, 0.05]
 bounds = [
     (0.0, 2.0),
@@ -171,23 +192,59 @@ bounds = [
     (0.001, 0.5),
 ]
 
-result = minimize(objective_function, initial_guess, bounds=bounds, method="differential_evolution")
-print(result.sucess)
-print(result.message)
+# if-Guard nötig, falls workers=-1 (Parallelisierung) verwendet wird
+if __name__ == "__main__":
+  result = differential_evolution(
+      objective_function, bounds,
+      args=("nse",),          # ÄNDERUNG: "nse", "log_nse" oder "bias"
+      seed=42,
+      maxiter=50,
+      popsize=15,
+      # workers=-1, updating="deferred",   # optional: schneller auf mehreren Kernen
+  )
+  print(result.success)
+  print(result.message)
 
-best_params = result.x
-print("Best parameters:", best_params)
+  best_params = result.x
+  print("Best parameters:", best_params)
 
-### 5. Validierung und Auswertung
-# Simulation für den Validierungszeitraum mit den kalibrierten Parametern
-Q_val_sim = run_model(best_params, val_data)
-Q_val_obs = val_data["discharge_spec(mm/d)"].values
+  ### 5. Validierung und Auswertung
+  # Kalibrierungsperiode auswerten (Simulation inkl. Warm-up)
+  Q_calib_sim, states_calib = simulate_periods(best_params)
+  Q_calib_obs = calib_data["discharge_spec(mm/d)"].values
 
-# Metriken berechnen
-nse_val = compute_nse(Q_val_obs, Q_val_sim)
-log_nse_val = compute_log_nse(Q_val_obs, Q_val_sim)
-bias_val = compute_bias(Q_val_obs, Q_val_sim)
+  print(f"Calibration NSE: {compute_nse(Q_calib_obs, Q_calib_sim):.3f}")
+  print(f"Calibration Log-NSE: {compute_log_nse(Q_calib_obs, Q_calib_sim):.3f}")
+  print(f"Calibration Bias: {compute_bias(Q_calib_obs, Q_calib_sim):.2f}%")
+  # print(f"Quick run-off (beta): {beta:.2f}%")
 
-print(f"Validation NSE: {nse_val:.3f}")
-print(f"Validation Log-NSE: {log_nse_val:.3f}")
-print(f"Validation Bias: {bias_val:.2f}%")
+  # Simulation für den Validierungszeitraum mit den kalibrierten Parametern
+  # Anfangszustände = Endzustände der Kalibrierung; Rückgabe ist ein Tuple
+  Q_val_sim, _ = run_model(best_params, val_data, initial_states=states_calib)
+  Q_val_obs = val_data["discharge_spec(mm/d)"].values
+
+  # Metriken berechnen
+  nse_val = compute_nse(Q_val_obs, Q_val_sim)
+  log_nse_val = compute_log_nse(Q_val_obs, Q_val_sim)
+  bias_val = compute_bias(Q_val_obs, Q_val_sim)
+
+  print(f"Validation NSE: {nse_val:.3f}")
+  print(f"Validation Log-NSE: {log_nse_val:.3f}")
+  print(f"Validation Bias: {bias_val:.2f}%")
+
+
+  ## 6. Wasserbilanz prüfen (Kalibrierungsperiode 1983-2009)
+  calib_mask = (dates >= "1983-01-01") & (dates <= "2009-12-31")
+
+  P_sum = calib_data["precipitation(mm/d)"].sum()
+  Q_sum = calib_data["discharge_spec(mm/d)"].sum()
+  PET_sum = PET[calib_mask].sum()
+  Q_sim_sum = np.nansum(Q_calib_sim)
+
+  print(f"Σ P (Niederschlag)      : {P_sum:.0f} mm")
+  print(f"Σ Q_obs (Abfluss beob.) : {Q_sum:.0f} mm")
+  print(f"Σ Q_sim (Abfluss sim.)  : {Q_sim_sum:.0f} mm")
+  print(f"Σ PET                   : {PET_sum:.0f} mm")
+  print(f"Q_obs / P               : {Q_sum / P_sum:.2f}")
+  print(f"P - Q_obs (= reale Verdunstung): {P_sum - Q_sum:.0f} mm")
+
