@@ -36,33 +36,34 @@ PET = calculate_hargreaves_pet(
     T_max=T_max,
     latitude_deg=46.230046)
 
-## 2. snow model
-# input: Precipitation (P) and Temperature (T_mean)
-# Output: SWE and Outflow
-# Parameters can be changed
-SWE_mod, Outflow, P_snow, P_rain, Melt = run_snow_model(
-    P=P,
-    T=T_mean,
-    T_min=1.0,
-    T_max=3.0,
-    m_f=3.0,
-    T_T=0.0,
-    SWE0=0.0)
-
-## 3. interception model
+## 2. interception model
 # Input: Outflow (from snow model) and PET
 # Output: Netto Precipitation (P_NET) and remaining PET for transpiration
 # Parameter can be changed
 P_net, Evap_icept, PET_transpiration, Unloading = run_interception_model(
-    P=Outflow,
+    P=P,
     PET=PET,
     icept_threshold=0.5)
+
+## 3. snow model
+# input: Precipitation (P) and Temperature (T_mean)
+# Output: SWE and Outflow
+# Parameters can be changed
+SWE_mod, Outflow, P_snow, P_rain, Melt = run_snow_model(
+    P=P_net,
+    T=T_mean,
+    T_snow=1.0,
+    T_rain=3.0,
+    m_f=3.0,
+    T_T=0.0,
+    SWE0=0.0)
+
 
 ## 4. Flowerpot model (soil/storage model)
 # Input: effective net precipitation and remaining PET
 # Output: Output: Simulated discharge time series (Q), soil water storage (S), soil evaporation (ET_soil)
 Q_modelled, Q_slow, Q_fast, S_soil, ET_soil = run_flowerpot_model(
-    P_eff=P_net,
+    P_eff=Outflow,
     PET_remaining=PET_transpiration,
     k=0.05,
     S_max=150.0,

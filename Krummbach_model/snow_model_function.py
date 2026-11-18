@@ -1,12 +1,12 @@
 import numpy as np
 
 
-def run_snow_model(P, T, T_min=1.0, T_max=3.0, m_f=2.0, T_T=0.0, SWE0=0.0):
+def run_snow_model(P, T, T_snow=1.0, T_rain=3.0, m_f=2.0, T_T=0.0, SWE0=0.0):
     """
     P : np.array -> Precipitation (mm/d)
     T : np.array -> Mean daily temperature (°C)
-    T_min : float -> Temperature below which 100% snow falls
-    T_max : float -> Temperature above which 100% rain falls
+    T_snow : float -> Temperature below which 100% snow falls
+    T_rain : float -> Temperature above which 100% rain falls
     m_f : float -> Degree-day melt factor [mm/(°C * day)]
     T_T : float -> Threshold temperature for melt
     SWE0 : float -> Initial SWE at the start
@@ -32,12 +32,12 @@ def run_snow_model(P, T, T_min=1.0, T_max=3.0, m_f=2.0, T_T=0.0, SWE0=0.0):
 
     for t in range(n):
         # 1. Rain/Snow Separation
-        if T[t] <= T_min:
+        if T[t] <= T_snow:
             snow_fraction = 1.0
-        elif T[t] >= T_max:
+        elif T[t] >= T_rain:
             snow_fraction = 0.0
         else:
-            snow_fraction = (T_max - T[t]) / (T_max - T_min)
+            snow_fraction = (T_rain - T[t]) / (T_rain - T_snow)
 
         P_snow[t] = P[t] * snow_fraction
         P_rain[t] = P[t] * (1.0 - snow_fraction)

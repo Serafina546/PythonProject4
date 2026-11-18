@@ -46,33 +46,33 @@ PET = calculate_hargreaves_pet(
     T_max=T_max,
     latitude_deg=46.230046)
 
-## 2. snow model
-# input: Precipitation (P) and Temperature (T_mean)
-# Output: SWE and Outflow
-# Parameters can be changed
-SWE_mod, Outflow, P_snow, P_rain, Melt = run_snow_model(
-    P=P,
-    T=T_mean,
-    T_min=1.0,
-    T_max=3.0,
-    m_f=3.0,
-    T_T=0.0,
-    SWE0=0.0)
-
-## 3. interception model
+## 2. interception model
 # Input: Outflow (from snow model) and PET
 # Output: Netto Precipitation (P_NET) and remaining PET for transpiration
 # Parameter can be changed
 P_net, Evap_icept, PET_transpiration, Unloading = run_interception_model(
-    P=Outflow,
+    P=P,
     PET=PET,
     icept_threshold=0.5)
+
+## 3. snow model
+# input: Precipitation (P) and Temperature (T_mean)
+# Output: SWE and Outflow
+# Parameters can be changed
+SWE_mod, Outflow, P_snow, P_rain, Melt = run_snow_model(
+    P=P_net,
+    T=T_mean,
+    T_snow=1.0,
+    T_rain=3.0,
+    m_f=3.0,
+    T_T=0.0,
+    SWE0=0.0)
 
 ## 4. Flowerpot model (soil/storage model)
 # Input: effective net precipitation and remaining PET
 # Output: Output: Simulated discharge time series (Q), soil water storage (S), soil evaporation (ET_soil)
 Q_modelled, S_soil, ET_soil = run_flowerpot_model(
-    P_eff=P_net,
+    P_eff=Outflow,
     PET_remaining=PET_transpiration,
     k=0.05,
     S0=0.0)
@@ -99,7 +99,7 @@ def compute_bias(q_obs, q_sim):
   q_obs, q_sim = q_obs[mask], q_sim[mask]
   return np.sum(q_sim - q_obs) / np.sum(q_obs) * 100  # in Prozent
 
-### 3. Modellkkette für einen Zeitraum bündeln
+### 3. Modellkette für einen Zeitraum bündeln
 from scipy.optimize import differential_evolution
 def run_model(params, df, initial_states=None):
 
@@ -112,7 +112,7 @@ def run_model(params, df, initial_states=None):
         S0 = initial_states["S"]
 
     # 2. Parameter entpacken
-    T_min_snow, T_max_snow, m_f, icept_threshold, k = params
+    T_snow, T_rain, m_f, icept_threshold, k = params
 
     # 3. PET berechnen
     PET = calculate_hargreaves_pet(
@@ -123,27 +123,27 @@ def run_model(params, df, initial_states=None):
         latitude_deg=46.230046,
     )
 
-    # 4. Schnee-Modell
-    SWE, Outflow, P_snow, P_rain, Melt = run_snow_model(
+    # 4. Interzeptions-Modell
+    P_net, Evap_icept, PET_transpiration, Unloading = run_interception_model(
         P=df["precipitation(mm/d)"].values,
+        PET=PET,
+        icept_threshold=icept_threshold,
+    )
+
+    # 5. Schnee-Modell
+    SWE, Outflow, P_snow, P_rain, Melt = run_snow_model(
+        P=P_net,
         T=df["temperature_mean(degC)"].values,
-        T_min=T_min_snow,
-        T_max=T_max_snow,
+        T_snow=T_snow,
+        T_rain=T_rain,
         m_f=m_f,
         T_T=0.0,
         SWE0=SWE0,
     )
 
-    # 5. Interzeptions-Modell
-    P_net, Evap_icept, PET_transpiration, Unloading = run_interception_model(
-        P=Outflow,
-        PET=PET,
-        icept_threshold=icept_threshold,
-    )
-
     # 6. Flowerpot-Modell
     Q_modelled, S, ET_soil = run_flowerpot_model(
-        P_eff=P_net,
+        P_eff=Outflow,
         PET_remaining=PET_transpiration,
         k=k,
         S0=S0,
