@@ -44,13 +44,14 @@ def run_flowerpot_model(P_eff, PET_remaining, k=0.1, perc_max=2.0, S_max=150.0, 
         # Abhängig von Bodenfeuchte, begrenzt durch maximale Versickerungsrate
         pot_perc = perc_max * saturation
         Percolation[t] = min(pot_perc, S_available)
+        S_available -= Percolation[t]
+
+        # 5. Schneller Zwischenabfluss (Interflow) aus der Bodenzone
+        Q_interflow[t] = k * S_available
         S_available -= Q_interflow[t]
 
-        # Neuen Speicherstand sichern
+        # 6. Speicher-Update
         S[t] = max(0.0, S_available)
         S_prev = S[t]
-
-        # Gesamtabfluss
-        Q_total[t] = Q_slow[t] + Q_fast[t]
 
     return Q_fast, Q_interflow, Percolation, S, ET_soil
