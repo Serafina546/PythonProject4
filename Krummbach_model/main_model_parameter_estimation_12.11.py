@@ -9,6 +9,7 @@ from interception_model_function import run_interception_model
 from flowerpot_quick_runoff_model_function import run_flowerpot_model
 from Glacial_melt_function import glacier_melt
 from groundwater_model_function import run_groundwater_model
+from elevation_bands_function import run_elevation_bands, check_bands
 
 plt.rcParams["font.family"] = "Arial"
 
@@ -82,8 +83,9 @@ def compute_bias(q_obs, q_sim):
 def run_model(params, df, initial_states=None, return_components=False):
 
     # 1. Anfangszustände (ÄNDERUNG: auch Gletscherschnee und Grundwasser)
+    # am Anfang von run_model:
     if initial_states is None:
-        initial_states = {"SWE": 0.0, "SWE_glacier": 0.0, "S": 0.0, "S_gw": 100.0}
+        initial_states = {"bands": None, "S": 0.0, "S_gw": 100.0}
 
     # 2. Parameter entpacken
     T_snow, T_rain, m_f, icept_threshold, k = params
@@ -108,6 +110,25 @@ def run_model(params, df, initial_states=None, return_components=False):
         icept_threshold=icept_threshold,
     )
 
+    # 5.+6. Schnee und Gletscher pro Höhenband
+    snow_params = dict(T_snow=T_snow, T_rain=T_rain, m_f=m_f, T_T=0.0)
+
+    eb = run_elevation_bands(
+        P=P_df,
+        P_net=P_net,
+        T=T_df,
+        bands=BANDS,
+        z_ref=Z_REF,
+        snow_params=snow_params,
+        ddf_ice=DDF_ICE,
+        lapse=-0.0065,
+        p_grad=0.0005,
+        initial_states=initial_states["bands"],
+    )
+    Outflow = eb["Outflow"]
+    Icemelt_catchment = eb["Icemelt_catchment"]
+
+    '''
     # 5. Schnee: EIN Parametersatz für Einzugsgebiet und Gletscher
     # (ÄNDERUNG: aus den kalibrierten Werten statt fix 1.0 / 3.0 / 3.0)
     snow_params = dict(T_snow=T_snow, T_rain=T_rain, m_f=m_f, T_T=0.0)
@@ -129,7 +150,7 @@ def run_model(params, df, initial_states=None, return_components=False):
         T0=0.0,
         snow_params={**snow_params, "SWE0": initial_states["SWE_glacier"]},
     )
-
+    '''
     # 7. Flowerpot (ÄNDERUNG: 5 Rückgabewerte, inkl. Percolation)
     Q_fast, Q_interflow, Percolation, S, ET_soil = run_flowerpot_model(
         P_eff=Outflow,
@@ -154,9 +175,9 @@ def run_model(params, df, initial_states=None, return_components=False):
     Q_modelled = Q_fast + Q_interflow + Q_baseflow + Icemelt_catchment
 
     # 10. Endzustände
+    # am Ende von run_model:
     final_states = {
-        "SWE": SWE[-1],
-        "SWE_glacier": SWE_glacier[-1],
+        "bands": eb["final_states"],
         "S": S[-1],
         "S_gw": S_gw[-1],
     }

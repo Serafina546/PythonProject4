@@ -5,7 +5,6 @@ from Glacial_melt_function import glacier_melt
 def adjust_temperature(T, z_ref, z_band, lapse=-0.0065):
     """
     Temperatur von der Referenzhöhe auf die Höhe eines Bandes umrechnen.
-
     T       : Temperatur-Zeitreihe auf Referenzhöhe (°C)
     z_ref   : Referenzhöhe (m ü. M.), i.d.R. mittlere Höhe des Einzugsgebiets
     z_band  : mittlere Höhe des Bandes (m ü. M.)
@@ -17,16 +16,13 @@ def adjust_temperature(T, z_ref, z_band, lapse=-0.0065):
 def precipitation_factors(bands, z_ref, p_grad=0.0005):
     """
     Niederschlagsfaktoren pro Band berechnen.
-
     p_grad : relative Zunahme pro Meter (0.0005 = +5 % pro 100 m)
-
     Die Faktoren werden so normiert, dass das flächengewichtete Mittel = 1 ist.
     So bleibt der Gebietsniederschlag (und damit die Wasserbilanz) unverändert;
     es wird nur umverteilt: oben mehr, unten weniger.
     """
     z = np.array([b["z"] for b in bands], dtype=float)
     area = np.array([b["area"] for b in bands], dtype=float)
-
     f = 1.0 + p_grad * (z - z_ref)
     f = np.maximum(f, 0.0)                       # keine negativen Faktoren
     f = f / np.sum(f * area / area.sum())        # Normierung auf Gebietsmittel = 1
@@ -54,7 +50,6 @@ def run_elevation_bands(P, P_net, T, bands, z_ref, snow_params, ddf_ice=7.0, T0=
                         lapse=-0.0065, p_grad=0.0005, initial_states=None):
     """
     Schnee- und Gletschermodell pro Höhenband rechnen und flächengewichtet aufsummieren.
-
     Input
     -----
     P              : Niederschlag (Gebietsmittel, ohne Interzeption) -> für Gletscher
@@ -65,7 +60,6 @@ def run_elevation_bands(P, P_net, T, bands, z_ref, snow_params, ddf_ice=7.0, T0=
     z_ref          : Referenzhöhe der Eingangsdaten (mittlere Höhe EZG)
     snow_params    : Schneeparameter OHNE SWE0 (z.B. T_snow, T_rain, m_f, T_T)
     initial_states : None oder Dict mit Listen "SWE" und "SWE_glacier" (ein Wert pro Band)
-
     Output (Dict)
     -------------
     Outflow            : Schnee-/Regen-Outflow, auf EZG bezogen (mm/d)
@@ -74,6 +68,14 @@ def run_elevation_bands(P, P_net, T, bands, z_ref, snow_params, ddf_ice=7.0, T0=
     T_bands, Outflow_bands, SWE_bands : Werte pro Band (für Plots/Kontrolle)
     final_states       : Endzustände pro Band (für die nächste Periode)
     """
+    BANDS = [
+        {"z": 1800, "area": 15.0, "glacier_area": 0.0},
+        {"z": 2200, "area": 25.0, "glacier_area": 0.0},
+        {"z": 2600, "area": 20.0, "glacier_area": 0.0},
+        {"z": 3000, "area": 5.0, "glacier_area": 1.0},
+    ]
+
+    Z_REF = check_bands(BANDS)  # flächengewichtete mittlere Höhe = Referenzhöhe
     P = np.asarray(P, dtype=float)
     P_net = np.asarray(P_net, dtype=float)
     T = np.asarray(T, dtype=float)
