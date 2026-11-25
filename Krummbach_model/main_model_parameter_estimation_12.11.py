@@ -1,6 +1,258 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from scipy.optimize import differential_evolution
+
+from snow_model_function import run_snow_model
+from PET_model_function import calculate_hargreaves_pet
+from interception_model_function import run_interception_model
+from flowerpot_quick_runoff_model_function import run_flowerpot_model
+from Glacial_melt_function import glacier_melt
+from groundwater_model_function import run_groundwater_model
+
+plt.rcParams["font.family"] = "Arial"
+
+# read and merge data
+data_sim = pd.read_csv(r"../data/CAMELS_CH_sim_based_2244.csv", parse_dates=["date"])
+data_obs = pd.read_csv(r"../data/CAMELS_CH_obs_based_2244.csv", parse_dates=["date"])
+
+data_obs = data_obs.set_index("date")
+data_sim = data_sim.set_index("date")
+data = data_obs.join(data_sim, how="inner", suffixes=("_obs", "_sim"))
+
+# extract variables
+dates = data.index
+P = data["precipitation(mm/d)"].values
+T_mean = data["temperature_mean(degC)"].to_numpy(dtype=float)
+T_min = data["temperature_min(degC)"].to_numpy(dtype=float)
+T_max = data["temperature_max(degC)"].to_numpy(dtype=float)
+Q_obs = data["discharge_spec(mm/d)"].to_numpy(dtype=float)
+
+# Fehlende Niederschlagswerte = 0
+s = pd.Series(P)
+print(f"Anzahl fehlender Niederschlagswerte: {s.isna().sum()}")
+P = s.fillna(0.0).to_numpy()
+
+# run_model liest den Niederschlag aus dem DataFrame, daher dort auch NaN -> 0 setzen
+data["precipitation(mm/d)"] = P
+
+# PET für das ganze Gebiet (wird für die Wasserbilanz am Schluss gebraucht)
+PET = calculate_hargreaves_pet(
+    dates=dates,
+    T_mean=T_mean,
+    T_min=T_min,
+    T_max=T_max,
+    latitude_deg=46.230046)
+
+# Feste (nicht kalibrierte) Parameter
+GLACIER_AREA = 2.0      # km², noch anpassen
+CATCHMENT_AREA = 80.0   # km², noch anpassen
+DDF_ICE = 7.0
+PERC_MAX = 2.5
+S_MAX = 150.0
+BETA = 1.5
+K_GW = 0.05
+
+### 1. Zeitraum-Filter definieren
+warmup_data = data.loc["1981-01-01":"1982-12-31"]  # Start mit leeren Speichern -> nicht auswerten
+calib_data = data.loc["1983-01-01":"2009-12-31"]
+val_data = data.loc["2010-01-01":"2020-12-31"]
+
+
+### 2. Objective functions
+def compute_nse(q_obs, q_sim):
+    mask = ~np.isnan(q_obs) & ~np.isnan(q_sim)
+    q_obs, q_sim = q_obs[mask], q_sim[mask]
+    return 1 - np.sum((q_obs - q_sim) ** 2) / np.sum((q_obs - np.mean(q_obs)) ** 2)
+
+
+def compute_log_nse(q_obs, q_sim):
+    mask = ~np.isnan(q_obs) & ~np.isnan(q_sim) & (q_obs > 0) & (q_sim > 0)
+    q_obs, q_sim = np.log(q_obs[mask]), np.log(q_sim[mask])
+    return 1 - np.sum((q_obs - q_sim) ** 2) / np.sum((q_obs - np.mean(q_obs)) ** 2)
+
+
+def compute_bias(q_obs, q_sim):
+    mask = ~np.isnan(q_obs) & ~np.isnan(q_sim)
+    q_obs, q_sim = q_obs[mask], q_sim[mask]
+    return np.sum(q_sim - q_obs) / np.sum(q_obs) * 100  # in Prozent
+
+
+### 3. Modellkette für einen Zeitraum
+def run_model(params, df, initial_states=None, return_components=False):
+
+    # 1. Anfangszustände (ÄNDERUNG: auch Gletscherschnee und Grundwasser)
+    if initial_states is None:
+        initial_states = {"SWE": 0.0, "SWE_glacier": 0.0, "S": 0.0, "S_gw": 100.0}
+
+    # 2. Parameter entpacken
+    T_snow, T_rain, m_f, icept_threshold, k = params
+
+    # Inputs IMMER aus df nehmen (ÄNDERUNG: nicht die globalen P / T_mean)
+    P_df = df["precipitation(mm/d)"].values
+    T_df = df["temperature_mean(degC)"].values
+
+    # 3. PET
+    PET_df = calculate_hargreaves_pet(
+        dates=df.index,
+        T_mean=T_df,
+        T_min=df["temperature_min(degC)"].values,
+        T_max=df["temperature_max(degC)"].values,
+        latitude_deg=46.230046,
+    )
+
+    # 4. Interzeption
+    P_net, Evap_icept, PET_transpiration, Unloading = run_interception_model(
+        P=P_df,
+        PET=PET_df,
+        icept_threshold=icept_threshold,
+    )
+
+    # 5. Schnee: EIN Parametersatz für Einzugsgebiet und Gletscher
+    # (ÄNDERUNG: aus den kalibrierten Werten statt fix 1.0 / 3.0 / 3.0)
+    snow_params = dict(T_snow=T_snow, T_rain=T_rain, m_f=m_f, T_T=0.0)
+
+    SWE, Outflow, P_snow, P_rain, Melt = run_snow_model(
+        P=P_net,
+        T=T_df,
+        SWE0=initial_states["SWE"],
+        **snow_params,
+    )
+
+    # 6. Gletscher (ÄNDERUNG: Inputs aus df, eigene Schnee-Anfangsbedingung)
+    SWE_glacier, Icemelt_glacier, Icemelt_catchment = glacier_melt(
+        P=P_df,
+        T=T_df,                       # später: höhenkorrigierte Temperatur
+        glacier_area=GLACIER_AREA,
+        catchment_area=CATCHMENT_AREA,
+        ddf_ice=DDF_ICE,
+        T0=0.0,
+        snow_params={**snow_params, "SWE0": initial_states["SWE_glacier"]},
+    )
+
+    # 7. Flowerpot (ÄNDERUNG: 5 Rückgabewerte, inkl. Percolation)
+    Q_fast, Q_interflow, Percolation, S, ET_soil = run_flowerpot_model(
+        P_eff=Outflow,
+        PET_remaining=PET_transpiration,
+        k=k,
+        perc_max=PERC_MAX,
+        S_max=S_MAX,
+        beta=BETA,
+        S0=initial_states["S"],
+    )
+
+    # 8. Grundwasser (ÄNDERUNG: Anfangszustand wird weitergegeben)
+    Q_baseflow, S_gw, GW_loss = run_groundwater_model(
+        Percolation=Percolation,
+        k_gw=K_GW,
+        alpha=1.0,
+        loss_fraction=0.0,
+        S_gw0=initial_states["S_gw"],
+    )
+
+    # 9. Gesamtabfluss (ÄNDERUNG: alle Komponenten + Eisschmelze)
+    Q_modelled = Q_fast + Q_interflow + Q_baseflow + Icemelt_catchment
+
+    # 10. Endzustände
+    final_states = {
+        "SWE": SWE[-1],
+        "SWE_glacier": SWE_glacier[-1],
+        "S": S[-1],
+        "S_gw": S_gw[-1],
+    }
+
+    if return_components:
+        components = dict(Q_fast=Q_fast, Q_interflow=Q_interflow,
+                          Q_baseflow=Q_baseflow, Icemelt=Icemelt_catchment)
+        return Q_modelled, final_states, components
+    return Q_modelled, final_states
+
+
+### 4. Kalibrierung
+def simulate_periods(params):
+    # Warm-up wird mit jedem Parametersatz neu gerechnet; Endzustände = Start der Kalibrierung
+    Q_warm, states_warm = run_model(params, warmup_data)
+    Q_calib, states_calib = run_model(params, calib_data, initial_states=states_warm)
+    return Q_calib, states_calib
+
+
+def objective_function(params, metric="nse"):
+    Q_sim, _ = simulate_periods(params)
+    Q_obs_cal = calib_data["discharge_spec(mm/d)"].values
+    if not np.all(np.isfinite(Q_sim)):
+        return 1e6
+    if metric == "nse":
+        return 1 - compute_nse(Q_obs_cal, Q_sim)
+    if metric == "log_nse":
+        return 1 - compute_log_nse(Q_obs_cal, Q_sim)
+    if metric == "bias":
+        return abs(compute_bias(Q_obs_cal, Q_sim))
+    raise ValueError(f"Unbekannte Zielfunktion: {metric}")
+
+
+# Reihenfolge: [T_snow, T_rain, m_f, icept_threshold, k]
+bounds = [
+    (0.0, 2.0),     # T_snow
+    (2.0, 5.0),     # T_rain
+    (1.0, 6.0),     # m_f
+    (0.0, 2.0),     # icept_threshold
+    (0.001, 0.5),   # k
+]
+
+if __name__ == "__main__":
+    result = differential_evolution(
+        objective_function, bounds,
+        args=("nse",),          # "nse", "log_nse" oder "bias"
+        seed=42,
+        maxiter=50,
+        popsize=15,
+        # workers=-1, updating="deferred",   # optional: schneller auf mehreren Kernen
+    )
+    print(result.success)
+    print(result.message)
+
+    best_params = result.x
+    print("Best parameters [T_snow, T_rain, m_f, icept_threshold, k]:", best_params)
+
+    ### 5. Validierung und Auswertung
+    Q_calib_sim, states_calib = simulate_periods(best_params)
+    Q_calib_obs = calib_data["discharge_spec(mm/d)"].values
+
+    print(f"Calibration NSE: {compute_nse(Q_calib_obs, Q_calib_sim):.3f}")
+    print(f"Calibration Log-NSE: {compute_log_nse(Q_calib_obs, Q_calib_sim):.3f}")
+    print(f"Calibration Bias: {compute_bias(Q_calib_obs, Q_calib_sim):.2f}%")
+
+    # Validierung: Anfangszustände = Endzustände der Kalibrierung
+    Q_val_sim, _ = run_model(best_params, val_data, initial_states=states_calib)
+    Q_val_obs = val_data["discharge_spec(mm/d)"].values
+
+    print(f"Validation NSE: {compute_nse(Q_val_obs, Q_val_sim):.3f}")
+    print(f"Validation Log-NSE: {compute_log_nse(Q_val_obs, Q_val_sim):.3f}")
+    print(f"Validation Bias: {compute_bias(Q_val_obs, Q_val_sim):.2f}%")
+
+    ## 6. Wasserbilanz prüfen (Kalibrierungsperiode 1983-2009)
+    calib_mask = (dates >= "1983-01-01") & (dates <= "2009-12-31")
+
+    P_sum = calib_data["precipitation(mm/d)"].sum()
+    Q_sum = calib_data["discharge_spec(mm/d)"].sum()
+    PET_sum = PET[calib_mask].sum()
+    Q_sim_sum = np.nansum(Q_calib_sim)
+
+    print(f"Σ P (Niederschlag)      : {P_sum:.0f} mm")
+    print(f"Σ Q_obs (Abfluss beob.) : {Q_sum:.0f} mm")
+    print(f"Σ Q_sim (Abfluss sim.)  : {Q_sim_sum:.0f} mm")
+    print(f"Σ PET                   : {PET_sum:.0f} mm")
+    print(f"Q_obs / P               : {Q_sum / P_sum:.2f}")
+    print(f"P - Q_obs (= reale Verdunstung): {P_sum - Q_sum:.0f} mm")
+
+    # Für die Jahresplots: ganze Zeitreihe mit den besten Parametern
+    Q_modelled_full, _ = run_model(best_params, data)
+
+'''
+#Old version
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
 from snow_model_function import run_snow_model
 from PET_model_function import calculate_hargreaves_pet
@@ -247,4 +499,4 @@ if __name__ == "__main__":
   print(f"Σ PET                   : {PET_sum:.0f} mm")
   print(f"Q_obs / P               : {Q_sum / P_sum:.2f}")
   print(f"P - Q_obs (= reale Verdunstung): {P_sum - Q_sum:.0f} mm")
-
+'''
