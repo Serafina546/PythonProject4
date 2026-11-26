@@ -45,7 +45,6 @@ def check_bands(bands, z_ref=None, tol=50.0):
               f"z_ref ({z_ref:.0f} m) ab. Die Gebietsmitteltemperatur bleibt dann nicht erhalten.")
     return z_mean
 
-
 def run_elevation_bands(P, P_net, T, bands, z_ref, snow_params, ddf_ice=7.0, T0=0.0,
                         lapse=-0.0065, p_grad=0.0005, initial_states=None):
     """
@@ -68,14 +67,7 @@ def run_elevation_bands(P, P_net, T, bands, z_ref, snow_params, ddf_ice=7.0, T0=
     T_bands, Outflow_bands, SWE_bands : Werte pro Band (für Plots/Kontrolle)
     final_states       : Endzustände pro Band (für die nächste Periode)
     """
-    BANDS = [
-        {"z": 1800, "area": 15.0, "glacier_area": 0.0},
-        {"z": 2200, "area": 25.0, "glacier_area": 0.0},
-        {"z": 2600, "area": 20.0, "glacier_area": 0.0},
-        {"z": 3000, "area": 5.0, "glacier_area": 1.0},
-    ]
 
-    Z_REF = check_bands(BANDS)  # flächengewichtete mittlere Höhe = Referenzhöhe
     P = np.asarray(P, dtype=float)
     P_net = np.asarray(P_net, dtype=float)
     T = np.asarray(T, dtype=float)

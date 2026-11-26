@@ -95,6 +95,20 @@ Q_baseflow, S_gw, GW_loss = run_groundwater_model(
     loss_fraction=0.0,
     S_gw0=100.0)
 
+# ELevation bands
+# Höhenbänder: (untere Grenze, obere Grenze, Fläche km², Gletscherfläche km²)
+BAND_LIMITS = [
+    (1800, 2200, 15.0, 0.0),
+    (2200, 2600, 25.0, 0.0),
+    (2600, 3000, 20.0, 1.0),
+]
+BANDS = [{"z": (z_min + z_max) / 2, "area": area, "glacier_area": g_area}
+         for z_min, z_max, area, g_area in BAND_LIMITS]
+
+Z_REF = check_bands(BANDS)
+print("Bänder:", BANDS)
+print(f"Referenzhöhe: {Z_REF:.0f} m")
+
 ## 6. Gesamtabfluss (Summe aus allen Abflusskomponenten)
 Q_modelled = Q_fast + Q_interflow + Q_baseflow + Icemelt_catchment
 
